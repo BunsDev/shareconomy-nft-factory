@@ -1,14 +1,14 @@
 import { run } from "hardhat"
 import hre from 'hardhat';
+import { upgrades } from "hardhat";
 const ethers = hre.ethers;
 
 async function main() {
-  const [owner] = await ethers.getSigners()
-
-  const Marketplace = await ethers.getContractFactory('Marketplace', owner)
-  const marketplace = await Marketplace.deploy()
-  await marketplace.deployed()
-  console.log("Marketplace contract has been deployed at", marketplace.address)
+  const ERC1155 = await ethers.getContractFactory('ERC1155');
+  const nft = await upgrades.deployProxy(ERC1155, ["proxy1155", "P1155", "", "0xa162B39F86A7341948A2E0A8DaC3f0DFf071D509", 0], { kind: 'uups'});
+  await nft.deployed();
+  console.log(nft);
+  console.log("Implementation deployed at ", nft.address);
 }
 
 async function verify(contractAddress: string, args: any) {

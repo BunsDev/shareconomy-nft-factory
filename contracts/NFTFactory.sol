@@ -12,8 +12,11 @@ contract NFTFactory {
     /// @notice Contact owner address
     address public owner;
 
-    /// @notice Address for implementation of NFT
+    /// @notice Address of ERC1155 implementation 
     address public implementation;
+
+    /// @notice Marketplace address
+    address public marketplace;
 
     event Deployed(address newNFTAddress);
 
@@ -82,9 +85,22 @@ contract NFTFactory {
             )))));
     }
 
+    /**
+     * @notice Sets address of ERC1155 implementation, avaliable only for Owner
+     * @param newImplementation address of new implementation
+     */
     function setImplementation(address newImplementation) external {
         isOwner();
         implementation = newImplementation;
+    }
+
+    /**
+     * @notice Sets Marketplace address for NFT trading, avaliable only for Owner
+     * @param newMarketplace address of new Marketplace
+     */
+    function setMarketplace(address newMarketplace) external {
+        isOwner();
+        marketplace = newMarketplace;
     }
 
     /// @notice Allowing access only to Owner

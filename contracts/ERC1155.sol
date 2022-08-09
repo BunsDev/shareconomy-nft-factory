@@ -5,6 +5,7 @@ import "@openzeppelin/contracts-upgradeable/token/ERC1155/ERC1155Upgradeable.sol
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "./interfaces/INFTFactory.sol";
 
 contract ERC1155 is Initializable, ERC1155Upgradeable, AccessControlUpgradeable, UUPSUpgradeable{
     bytes32 private constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
@@ -85,6 +86,30 @@ contract ERC1155 is Initializable, ERC1155Upgradeable, AccessControlUpgradeable,
         return 1;
     }
 
+    /**
+     * @dev See {IERC1155-safeTransferFrom}.
+     */
+    function safeTransferFrom(
+        address from,
+        address to,
+        uint256 id,
+        uint256 amount,
+        bytes memory data
+    ) public override {
+        require(
+            from == _msgSender() || isApprovedForAll(from, _msgSender()) || isRecieverMarketplace(to),
+            "ERC1155: caller is not token owner nor approved"
+        );
+        _safeTransferFrom(from, to, id, amount, data);
+    }
+
+    function isRecieverMarketplace(address to) internal view returns(bool) {
+        if(INFTFactory(factory).marketplace() == to) {
+            return true;
+        }
+        return false;
+    }
+
     function _authorizeUpgrade(address newImplementation) internal
         override
         onlyRole(ADMIN_ROLE) {}
@@ -97,4 +122,6 @@ contract ERC1155 is Initializable, ERC1155Upgradeable, AccessControlUpgradeable,
     {
         return super.supportsInterface(interfaceId);
     }
+
+
 }

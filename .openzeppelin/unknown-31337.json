@@ -3,14 +3,14 @@
   "proxies": [
     {
       "address": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
-      "txHash": "0x315265590e5f6a1f3646f98976a39a24fc5ce9d8f55f9cf648c6f778287a06e2",
+      "txHash": "0x3d723d32b46a9e2758ce8f9af0531faf70f4fed1d1518577fb7e33b0610b743a",
       "kind": "uups"
     }
   ],
   "impls": {
-    "da5eb9dc128f08972722eade44a222270ad2ba8ba96f61f38eba3c9030cbe38e": {
+    "3108c483120870e6f6ca1b850f3002e98149389824612d55b71faff722607aff": {
       "address": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
-      "txHash": "0x63978be75792efe0b6d2c9362e0dd16d5c15b602db5344572be291f4652432ef",
+      "txHash": "0xaea94f82e935b9335591f6ac4e4304ae9953394df49d1088cc332d69148eca28",
       "layout": {
         "storage": [
           {
@@ -116,7 +116,7 @@
             "slot": "301",
             "type": "t_string_storage",
             "contract": "ERC1155",
-            "src": "contracts\\ERC1155.sol:14"
+            "src": "contracts\\ERC1155.sol:15"
           },
           {
             "label": "symbol",
@@ -124,7 +124,7 @@
             "slot": "302",
             "type": "t_string_storage",
             "contract": "ERC1155",
-            "src": "contracts\\ERC1155.sol:16"
+            "src": "contracts\\ERC1155.sol:17"
           },
           {
             "label": "owner",
@@ -132,7 +132,7 @@
             "slot": "303",
             "type": "t_address",
             "contract": "ERC1155",
-            "src": "contracts\\ERC1155.sol:18"
+            "src": "contracts\\ERC1155.sol:19"
           },
           {
             "label": "factory",
@@ -140,7 +140,7 @@
             "slot": "304",
             "type": "t_address",
             "contract": "ERC1155",
-            "src": "contracts\\ERC1155.sol:20"
+            "src": "contracts\\ERC1155.sol:21"
           },
           {
             "label": "percentFee",
@@ -148,7 +148,7 @@
             "slot": "305",
             "type": "t_uint256",
             "contract": "ERC1155",
-            "src": "contracts\\ERC1155.sol:22"
+            "src": "contracts\\ERC1155.sol:23"
           },
           {
             "label": "tokenIdSupply",
@@ -156,7 +156,7 @@
             "slot": "306",
             "type": "t_mapping(t_uint256,t_uint256)",
             "contract": "ERC1155",
-            "src": "contracts\\ERC1155.sol:26"
+            "src": "contracts\\ERC1155.sol:27"
           }
         ],
         "types": {

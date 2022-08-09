@@ -7,5 +7,8 @@ typechain
 
 #Hardhat files
 cache
-artifacts
+artifacts/@openzeppelin
+artifacts/build-info
+artifacts/contracts/interfaces
+artifacts/contracts/NFTProxy.sol
 typechain-types

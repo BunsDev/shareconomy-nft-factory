@@ -21,7 +21,7 @@ task("upgrade", "Upgrades NFT contract")
 const config: HardhatUserConfig = {
   networks: {
     matic: {
-      url: "https://matic-mumbai.chainstacklabs.com/",
+      url: `https://polygon-mumbai.g.alchemy.com/v2/${process.env.ALCHEMY_KEY}`,
       accounts:
       process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
       gas: 8000000

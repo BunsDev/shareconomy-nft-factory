@@ -2,13 +2,23 @@ import { run } from "hardhat"
 import hre from 'hardhat';
 const ethers = hre.ethers;
 
+const args: string[] = [
+  "0x4f2E92843822096518509700C418a31601E9cA51",
+  "0x861b7639aA220DE621428BeC338696ef0c231Aaf",
+  "0xFF58007B41399A5629922d1aBc6430d97371D64c",
+  "0xdEE581E5b5905F1cE77CeFd3cF7444aDA570D0ef"
+]
+
 async function main() {
   const [owner] = await ethers.getSigners()
-
   const NFTFactory = await ethers.getContractFactory('NFTFactory', owner)
-  const nftfactory = await NFTFactory.deploy()
+  console.log("Deploying contract...")
+  const nftfactory = await NFTFactory.deploy(...args)
   await nftfactory.deployed()
   console.log("NFTFactory contract has been deployed at", nftfactory.address)
+
+  await nftfactory.deployTransaction.wait(6)
+  await verify(nftfactory.address, args)
 }
 
 async function verify(contractAddress: string, args: any) {

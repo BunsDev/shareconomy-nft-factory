@@ -31,7 +31,9 @@ contract ERC1155 is Initializable, ERC1155Upgradeable, AccessControlUpgradeable,
         string memory symbol_,
         string memory baseURI_,
         address owner_,
-        uint256 percentFee_
+        uint256 percentFee_,
+        uint256[] memory ids_,
+        uint256[] memory amounts_
     ) initializer public {
         __ERC1155_init(baseURI_);
         __AccessControl_init();
@@ -46,6 +48,11 @@ contract ERC1155 is Initializable, ERC1155Upgradeable, AccessControlUpgradeable,
         grantRole(DEFAULT_ADMIN_ROLE, owner_);
         grantRole(ADMIN_ROLE, owner_);
         grantRole(MINTER_ROLE, owner_);
+
+        _mintBatch(owner_, ids_, amounts_, "");
+        for (uint i = 0; i < ids_.length; i++) {
+            tokenIdSupply[ids_[i]] += amounts_[i];
+        }
     }
 
     function mint(address account, uint256 id, uint256 amount) external onlyRole(MINTER_ROLE) {
@@ -64,16 +71,16 @@ contract ERC1155 is Initializable, ERC1155Upgradeable, AccessControlUpgradeable,
         _setURI(_newBaseURI);
     }
 
-    function burn(address account, uint256 id, uint256 amount) external {
+    function burn(uint256 id, uint256 amount) external {
         tokenIdSupply[id] -= amount;
-        _burn(account, id, amount);
+        _burn(msg.sender, id, amount);
     }
 
-    function burnBatch(address account, uint256[] memory ids, uint256[] memory amounts) external {
+    function burnBatch(uint256[] memory ids, uint256[] memory amounts) external {
         for (uint i = 0; i < ids.length; i++) {
             tokenIdSupply[ids[i]] -= amounts[i];
         }
-        _burnBatch(account, ids, amounts);
+        _burnBatch(msg.sender, ids, amounts);
     }
 
     /// @notice Changes fee percent for NFT contract owner, available only for ADMIN_ROLE
@@ -97,14 +104,14 @@ contract ERC1155 is Initializable, ERC1155Upgradeable, AccessControlUpgradeable,
         bytes memory data
     ) public override {
         require(
-            from == _msgSender() || isApprovedForAll(from, _msgSender()) || isRecieverMarketplace(to),
+            from == _msgSender() || isApprovedForAll(from, _msgSender()) || isMarketplaceReceiver(from, to),
             "ERC1155: caller is not token owner nor approved"
         );
         _safeTransferFrom(from, to, id, amount, data);
     }
 
-    function isRecieverMarketplace(address to) internal view returns(bool) {
-        if(INFTFactory(factory).marketplace() == to) {
+    function isMarketplaceReceiver(address from, address to) internal view returns(bool) {
+        if(INFTFactory(factory).marketplace1155() == to && from == tx.origin) {
             return true;
         }
         return false;

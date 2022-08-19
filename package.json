@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@typechain/hardhat": "^6.1.2",
+    "hardhat-contract-sizer": "^2.6.1",
     "hardhat-gas-reporter": "^1.0.8"
   }
 }

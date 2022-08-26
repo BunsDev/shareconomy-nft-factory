@@ -19,6 +19,14 @@ contract ERC721 is Initializable, ERC721Upgradeable, AccessControlUpgradeable, U
     bytes32 private constant MINTER_ROLE = keccak256("MINTER_ROLE");
     CountersUpgradeable.Counter private _tokenIdCounter;
 
+    /// @dev Struct for getting contract metadata
+    struct Metadata {
+        string name;
+        string symbol;
+        string tokenType;
+        string baseUri;
+    }
+
     /// @notice Contract owner address
     address public owner;
     /// @notice Deployer contract address
@@ -110,6 +118,14 @@ contract ERC721 is Initializable, ERC721Upgradeable, AccessControlUpgradeable, U
     /// @notice Returns version of implementation
     function getVersion() public pure returns(uint256) {
         return 1;
+    }
+
+    /// @notice Returns contract`s name, symbol, checks ERC721 interface and uri
+    function getContractMetadata() public view returns(Metadata memory metadata) {
+        metadata.name = name();
+        metadata.symbol = symbol();
+        metadata.tokenType = supportsInterface(0x80ac58cd) ? "ERC721" : "";
+        metadata.baseUri = _baseURI();
     }
 
     /// @dev Upgrades implementation with UUPS pattern

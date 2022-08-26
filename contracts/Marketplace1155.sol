@@ -44,7 +44,7 @@ contract Marketplace1155 {
     }
 
     /// @dev Struct for getting general info about NFTContractInfo without mappings
-    struct _NFTContractInfo{
+    struct _NFTContractInfo {
         uint256 lastOrderId;
         uint256 currentOrders;
         uint256 lastAuctionId;
@@ -97,7 +97,7 @@ contract Marketplace1155 {
         uint256 indexed orderId,
         bool indexed accepted
     );
-    event OrderInitialized(
+    event OrderCompleted(
         address indexed NFTAddress,
         uint256 indexed orderId,
         address indexed buyer
@@ -215,8 +215,8 @@ contract Marketplace1155 {
         payable
     {
         require(
-            msg.value >= TradingInfo[contractAddress].NFTOrders[orderId].priceWEI,
-            "Insufficient funds to redeem"
+            msg.value == TradingInfo[contractAddress].NFTOrders[orderId].priceWEI,
+            "Incorrect funds to redeem"
         );
         require(
             TradingInfo[contractAddress].NFTOrders[orderId].buyer == address(0),
@@ -257,12 +257,34 @@ contract Marketplace1155 {
     }
 
     /**
+     * @notice Returns funds to order buyer, can only be called by order seller or buyer
+     * @param contractAddress ERC1155 contract address
+     * @param orderId Order id you want to return funds
+     * @dev Do not revert if can not send WEI to order buyer
+     */
+    function declineOrder(address contractAddress, uint256 orderId)
+    external
+    nonReentrant
+    {
+        Order storage order = TradingInfo[contractAddress].NFTOrders[orderId];
+        require(msg.sender == order.buyer || msg.sender == order.seller, "Only seller or buyer can decline");
+        require(order.buyer != address(0), "Nothing to decline");
+
+        (bool success, ) = order.buyer.call{value: order.priceWEI}("");
+
+        TradingInfo[contractAddress].NFTOrders[orderId].buyer = address(0);
+        TradingInfo[contractAddress].NFTOrders[orderId].sellerAccepted = false;
+
+        emit FundsReturned(contractAddress, orderId, false, msg.sender);
+    }
+
+    /**
      * @notice Initializes token transfer to buyer, fees to NFT contract owner and reward to seller
      * @param contractAddress ERC1155 contract address
      * @param orderId Order id you want to initialize 
      * @dev Anyone can call this function, reverts if any 'success' value returns false
      */
-    function initializeOrder(address contractAddress, uint256 orderId)
+    function completeOrder(address contractAddress, uint256 orderId)
         external
         nonReentrant
     {
@@ -285,29 +307,7 @@ contract Marketplace1155 {
 
         delete TradingInfo[contractAddress].NFTOrders[orderId];
 
-        emit OrderInitialized(contractAddress, orderId, order.buyer);
-    }
-
-    /**
-     * @notice Returns funds to order buyer, can only be called by order seller or buyer
-     * @param contractAddress ERC1155 contract address
-     * @param orderId Order id you want to return funds
-     * @dev Do not revert if can not send WEI to order buyer
-     */
-    function declineOrder(address contractAddress, uint256 orderId)
-        external
-        nonReentrant
-    {
-        Order storage order = TradingInfo[contractAddress].NFTOrders[orderId];
-        require(msg.sender == order.buyer || msg.sender == order.seller, "Only seller or buyer can decline");
-        require(order.buyer != address(0), "Nothing to decline");
-
-        (bool success, ) = order.buyer.call{value: order.priceWEI}("");
-        
-        TradingInfo[contractAddress].NFTOrders[orderId].buyer = address(0);
-        TradingInfo[contractAddress].NFTOrders[orderId].sellerAccepted = false;
-
-        emit FundsReturned(contractAddress, orderId, false, msg.sender);
+        emit OrderCompleted(contractAddress, orderId, order.buyer);
     }
 
     /**
@@ -382,7 +382,7 @@ contract Marketplace1155 {
      * @param auctionId Auction id you want to finish and initialize
      * @dev Reverts if can not send fee to NFT contract owner or reward to 'bestBidder'
      */
-    function finishAuction(address contractAddress, uint256 auctionId) external nonReentrant {
+    function completeAuction(address contractAddress, uint256 auctionId) external nonReentrant {
         Auction storage auction = TradingInfo[contractAddress].NFTAuctions[auctionId];
 
         require(auction.auctionEndUnix < block.timestamp, "Auction time did not pass");

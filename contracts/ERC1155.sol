@@ -11,6 +11,14 @@ contract ERC1155 is Initializable, ERC1155Upgradeable, AccessControlUpgradeable,
     bytes32 private constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     bytes32 private constant MINTER_ROLE = keccak256("MINTER_ROLE");
 
+    /// @dev Struct for getting contract metadata
+    struct Metadata {
+        string name;
+        string symbol;
+        string tokenType;
+        string baseUri;
+    }
+
     /// @notice name of the collection
     string public name;
     /// @notice symbol of the collection
@@ -110,6 +118,15 @@ contract ERC1155 is Initializable, ERC1155Upgradeable, AccessControlUpgradeable,
         _safeTransferFrom(from, to, id, amount, data);
     }
 
+    /// @notice Returns contract`s name, symbol, checks ERC1155 interface and uri
+    function getContractMetadata() public view returns(Metadata memory metadata) {
+        metadata.name = name;
+        metadata.symbol = symbol;
+        metadata.tokenType = supportsInterface(0xd9b67a26) ? "ERC1155" : "";
+        metadata.baseUri = uri(0);
+    }
+
+    /// @dev Additional check for trading tokens on factory`s marketplace
     function isMarketplaceReceiver(address from, address to) internal view returns(bool) {
         if(INFTFactory(factory).marketplace1155() == to && from == tx.origin) {
             return true;
@@ -117,10 +134,12 @@ contract ERC1155 is Initializable, ERC1155Upgradeable, AccessControlUpgradeable,
         return false;
     }
 
+    /// @dev Needs for upgrading contract implementation
     function _authorizeUpgrade(address newImplementation) internal
         override
         onlyRole(ADMIN_ROLE) {}
 
+    /// @dev Checks ERC1155 interface by id
     function supportsInterface(bytes4 interfaceId)
         public
         view

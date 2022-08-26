@@ -1,24 +1,35 @@
-import { run } from "hardhat"
+import {run, upgrades} from "hardhat"
 import hre from 'hardhat';
 const ethers = hre.ethers;
 
+// const args: string[] = [
+//   "0x4f2E92843822096518509700C418a31601E9cA51",
+//   "0x861b7639aA220DE621428BeC338696ef0c231Aaf",
+//   "0xFF58007B41399A5629922d1aBc6430d97371D64c",
+//   "0xdEE581E5b5905F1cE77CeFd3cF7444aDA570D0ef"
+// ]
+
 const args: string[] = [
-  "0x4f2E92843822096518509700C418a31601E9cA51",
-  "0x861b7639aA220DE621428BeC338696ef0c231Aaf",
-  "0xFF58007B41399A5629922d1aBc6430d97371D64c",
-  "0xdEE581E5b5905F1cE77CeFd3cF7444aDA570D0ef"
+  "0x125281199964620d35d63886F492b79415926661",
+  "0xA8547B1e8AD1ceFDC8C0833E711011F37983B96d",
+  "0xC30e9c230f782a7A96b8c615f1276564F3d70724",
+  "0x09801CF826d876E6cc2aa32f6127b099C8D0EA2C"
 ]
 
 async function main() {
   const [owner] = await ethers.getSigners()
   const NFTFactory = await ethers.getContractFactory('NFTFactory', owner)
   console.log("Deploying contract...")
-  const nftfactory = await NFTFactory.deploy(...args)
-  await nftfactory.deployed()
-  console.log("NFTFactory contract has been deployed at", nftfactory.address)
+  const NFTFactoryProxy = await upgrades.deployProxy(
+      NFTFactory,
+      args,
+      {kind: 'uups'}
+  );
+  await NFTFactoryProxy.deployed()
+  console.log("NFTFactory contract has been deployed at", NFTFactoryProxy.address)
 
-  await nftfactory.deployTransaction.wait(6)
-  await verify(nftfactory.address, args)
+  await NFTFactoryProxy.deployTransaction.wait(6)
+  await verify(NFTFactoryProxy.address, args)
 }
 
 async function verify(contractAddress: string, args: any) {

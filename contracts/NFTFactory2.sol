@@ -11,7 +11,7 @@ import "./NFTProxy.sol";
 import "./ERC1155.sol";
 import "./ERC721.sol";
 
-contract NFTFactory is Initializable, UUPSUpgradeable{
+contract NFTFactory2 is Initializable, UUPSUpgradeable{
     /// @notice Contact owner address
     address public owner;
 
@@ -30,10 +30,14 @@ contract NFTFactory is Initializable, UUPSUpgradeable{
     event Deployed(address contractAddress);
 
     function initialize(
+        address _implementation1155,
+        address _implementation721,
         address _marketplace1155,
         address _marketplace721
     ) initializer public {
         owner = tx.origin;
+        implementation1155 = _implementation1155;
+        implementation721 = _implementation721;
         marketplace1155 = _marketplace1155;
         marketplace721 = _marketplace721;
     }
@@ -169,7 +173,7 @@ contract NFTFactory is Initializable, UUPSUpgradeable{
 
     /// @notice Returns version of implementation of NFTFactory
     function getVersion() public view returns(uint256 version) {
-        return 1;
+        return 2;
     }
 
     /// @notice Allowing access only to Owner

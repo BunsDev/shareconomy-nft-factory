@@ -94,7 +94,7 @@ contract Marketplace721 {
         uint256 indexed orderId,
         bool indexed accepted
     );
-    event OrderInitialized(
+    event OrderCompleted(
         address indexed NFTAddress,
         uint256 indexed orderId,
         address indexed buyer
@@ -246,12 +246,12 @@ contract Marketplace721 {
     }
 
     /**
-     * @notice Initializes token transfer to buyer, fees to NFT contract owner and reward to seller
+     * @notice Completes order, transfers token to buyer, fees to NFT contract owner and reward to seller
      * @param contractAddress ERC721 contract address
      * @param orderId Order id you want to initialize
      * @dev Anyone can call this function, reverts if 'hasSentWEIToSeller' or 'hasSentWEIToOwner' value returns false
      */
-    function initializeOrder(address contractAddress, uint256 orderId)
+    function completeOrder(address contractAddress, uint256 orderId)
         external
         nonReentrant
     {
@@ -274,7 +274,7 @@ contract Marketplace721 {
 
         delete TradingInfo[contractAddress].NFTOrders[orderId];
 
-        emit OrderInitialized(contractAddress, orderId, order.buyer);
+        emit OrderCompleted(contractAddress, orderId, order.buyer);
     }
 
     /**
@@ -366,7 +366,7 @@ contract Marketplace721 {
      * @param auctionId Auction id you want to finish and initialize
      * @dev Reverts if can not send fee to NFT contract owner or reward to 'bestBidder'
      */
-    function finishAuction(address contractAddress, uint256 auctionId) external nonReentrant {
+    function completeAuction(address contractAddress, uint256 auctionId) external nonReentrant {
         Auction storage auction = TradingInfo[contractAddress].NFTAuctions[auctionId];
 
         require(auction.auctionEndUnix < block.timestamp, "Auction time did not pass");

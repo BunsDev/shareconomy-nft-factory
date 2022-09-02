@@ -3,15 +3,19 @@ pragma solidity ^0.8.9;
 
 /// @title NFTFactory
 /// @author AkylbekAD
-/// @notice This contract allows you predict address and deploy ERC1155 token contract
+/// @notice This contract allows you predict address and deploy ERC20, ERC721, ERC1155 token contracts
 
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/introspection/IERC165Upgradeable.sol";
 import "./NFTProxy.sol";
 import "./ERC1155.sol";
 import "./ERC721.sol";
+import "./ERC20.sol";
 
 contract NFTFactory2 is Initializable, UUPSUpgradeable{
+    /// @notice ERC20 interface id for checking its implementation
+    bytes4 public constant IERC20_ID = 0x01ffc9a7;
     /// @notice Contact owner address
     address public owner;
 
@@ -20,6 +24,9 @@ contract NFTFactory2 is Initializable, UUPSUpgradeable{
 
     /// @notice Address of ERC721 implementation
     address public implementation721;
+
+    /// @notice Address of ERC20 implementation
+    address public implementation20;
 
     /// @notice Marketplace address for ERC1155
     address public marketplace1155;
@@ -30,14 +37,10 @@ contract NFTFactory2 is Initializable, UUPSUpgradeable{
     event Deployed(address contractAddress);
 
     function initialize(
-        address _implementation1155,
-        address _implementation721,
         address _marketplace1155,
         address _marketplace721
     ) initializer public {
         owner = tx.origin;
-        implementation1155 = _implementation1155;
-        implementation721 = _implementation721;
         marketplace1155 = _marketplace1155;
         marketplace721 = _marketplace721;
     }
@@ -60,6 +63,7 @@ contract NFTFactory2 is Initializable, UUPSUpgradeable{
         string memory symbol,
         string memory baseURI,
         address newOwner,
+        address erc20,
         uint256 percentFee,
         uint256 _salt,
         uint256 amount,
@@ -67,7 +71,12 @@ contract NFTFactory2 is Initializable, UUPSUpgradeable{
         uint256 [] memory amounts
     ) public returns (address contractAddress) {
         require(percentFee > 0 && percentFee <= 10000, "Invalid Fee");
+
         if (standard == 721) {
+            if(erc20 != address(0)) {
+                require(IERC165Upgradeable(erc20).supportsInterface(IERC20_ID), "Contract does not support ERC20");
+            }
+
             bytes32 byteSalt = bytes32(_salt);
             NFTProxy nftContract = new NFTProxy{salt : byteSalt}(implementation721, "");
 
@@ -78,6 +87,7 @@ contract NFTFactory2 is Initializable, UUPSUpgradeable{
                 symbol,
                 baseURI,
                 newOwner,
+                erc20,
                 percentFee,
                 amount
             );
@@ -88,6 +98,10 @@ contract NFTFactory2 is Initializable, UUPSUpgradeable{
         }
 
         if (standard == 1155) {
+            if(erc20 != address(0)) {
+                require(IERC165Upgradeable(erc20).supportsInterface(IERC20_ID), "Contract does not support ERC20");
+            }
+
             bytes32 byteSalt = bytes32(_salt);
             NFTProxy nftContract = new NFTProxy{salt : byteSalt}(implementation1155, "");
 
@@ -98,9 +112,28 @@ contract NFTFactory2 is Initializable, UUPSUpgradeable{
                 symbol,
                 baseURI,
                 newOwner,
+                erc20,
                 percentFee,
                 ids,
                 amounts
+            );
+
+            emit Deployed(_contractAddress);
+
+            return (_contractAddress);
+        }
+
+        if (standard == 20) {
+            bytes32 byteSalt = bytes32(_salt);
+            NFTProxy nftContract = new NFTProxy{salt : byteSalt}(implementation20, "");
+
+            address payable _contractAddress = payable(address(nftContract));
+
+            ERC20(_contractAddress).initialize(
+                name,
+                symbol,
+                newOwner,
+                amount
             );
 
             emit Deployed(_contractAddress);
@@ -115,7 +148,13 @@ contract NFTFactory2 is Initializable, UUPSUpgradeable{
      * @param _salt Some random number which effects to the ERC1155 address and used only for deploying
      */
     function predictAddress(uint256 standard, uint256 _salt) public view returns (address contractAddress) {
-        address implementation = standard == 1155 ? implementation1155 : implementation721;
+        address implementation;
+
+        if (standard == 20) implementation = implementation20;
+        if (standard == 721) implementation = implementation721;
+        if (standard == 1155) implementation = implementation1155;
+
+        require(implementation != address(0), "Invalid standard value");
 
         return address(uint160(uint(keccak256(abi.encodePacked(
                 bytes1(0xff),
@@ -137,12 +176,9 @@ contract NFTFactory2 is Initializable, UUPSUpgradeable{
      */
     function setImplementation(uint256 standard, address newImplementation) external {
         isOwner();
-        if (standard == 1155) {
-            implementation1155 = newImplementation;
-        }
-        if (standard == 721) {
-            implementation721 = newImplementation;
-        }
+        if (standard == 1155) implementation1155 = newImplementation;
+        if (standard == 721) implementation721 = newImplementation;
+        if (standard == 20) implementation20 = newImplementation;
     }
 
     /**
@@ -151,12 +187,8 @@ contract NFTFactory2 is Initializable, UUPSUpgradeable{
      */
     function setMarketplace(uint256 standard, address newMarketplace) external {
         isOwner();
-        if (standard == 1155) {
-            marketplace1155 = newMarketplace;
-        }
-        if (standard == 721) {
-            marketplace721 = newMarketplace;
-        }
+        if (standard == 1155) marketplace1155 = newMarketplace;
+        if (standard == 721) marketplace721 = newMarketplace;
     }
 
     /// @dev Transfer ownership to another account, allowed only for Owner
@@ -172,7 +204,7 @@ contract NFTFactory2 is Initializable, UUPSUpgradeable{
     }
 
     /// @notice Returns version of implementation of NFTFactory
-    function getVersion() public view returns(uint256 version) {
+    function getVersion() public pure returns(uint256 version) {
         return 2;
     }
 

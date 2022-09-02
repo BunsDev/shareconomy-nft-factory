@@ -9,4 +9,6 @@ interface IERC1155UUPS is IERC1155Upgradeable {
     function percentFee() external returns(uint256);
     
     function owner() external returns(address);
+
+    function erc20() external returns(address);
 }

@@ -27,6 +27,8 @@ contract ERC1155 is Initializable, ERC1155Upgradeable, AccessControlUpgradeable,
     address public owner;
     /// @notice Deployer contract address  
     address public factory;
+    /// @notice NFT collection ERC20 token
+    address public erc20;
     /// @notice Fee in percent which contract owner takes for selling NFT on Trade contract
     uint256 public percentFee;
     /// @notice Decimals of 'percentFee' number, example: 25.55% in 'percentFee' would be 2555
@@ -39,6 +41,7 @@ contract ERC1155 is Initializable, ERC1155Upgradeable, AccessControlUpgradeable,
         string memory symbol_,
         string memory baseURI_,
         address owner_,
+        address erc20_,
         uint256 percentFee_,
         uint256[] memory ids_,
         uint256[] memory amounts_
@@ -51,6 +54,7 @@ contract ERC1155 is Initializable, ERC1155Upgradeable, AccessControlUpgradeable,
         symbol = symbol_;
         owner = owner_;
         factory = msg.sender;
+        erc20 = erc20_;
         percentFee = percentFee_;
         _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
         grantRole(DEFAULT_ADMIN_ROLE, owner_);
@@ -97,6 +101,12 @@ contract ERC1155 is Initializable, ERC1155Upgradeable, AccessControlUpgradeable,
         percentFee = _percentFee;
     }
 
+    /// @notice Changes ERC20 address for this collection
+    function changeERC20Address(address newERC20Address) external onlyRole(ADMIN_ROLE) {
+        require(IERC165Upgradeable(erc20).supportsInterface(0x01ffc9a7), "Contract does not support ERC20");
+        erc20 = newERC20Address;
+    }
+
     function getVersion() public pure returns(uint256) {
         return 1;
     }
@@ -122,7 +132,7 @@ contract ERC1155 is Initializable, ERC1155Upgradeable, AccessControlUpgradeable,
     function getContractMetadata() public view returns(Metadata memory metadata) {
         metadata.name = name;
         metadata.symbol = symbol;
-        metadata.tokenType = supportsInterface(0xd9b67a26) ? "ERC1155" : "";
+        metadata.tokenType = supportsInterface(0xd9b67a26) ? "ERC1155" : "Unknown interface id";
         metadata.baseUri = uri(0);
     }
 

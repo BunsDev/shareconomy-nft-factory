@@ -6,18 +6,20 @@ pragma solidity ^0.8.9;
 /// @author AkylbekAD
 /// @notice Marketplace contract where ERC1155 from NFTFactory NFTs could be traded
 
+import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "./interfaces/IERC1155UUPS.sol";
 
 contract Marketplace1155 {
     /// @dev Contains all data types of each order
     struct Order {
         uint256 orderId;
-        uint256 priceWEI;
+        uint256 price;
         uint256 tokenId;
         uint256 amount;
         uint256 percentFee;
         address seller;
         address buyer;
+        address erc20;
         bool sellerAccepted;
     }
 
@@ -31,6 +33,7 @@ contract Marketplace1155 {
         uint256 auctionEndUnix;
         address bestBidder;
         address seller;
+        address erc20;
     }
 
     /// @dev Contains all info about existing orders and auctions of ERC1155 tokens
@@ -58,7 +61,7 @@ contract Marketplace1155 {
     uint256 constant public percentDecimals = 2;
 
     /// @notice Minimal amount of time for each auction in seconds
-    uint256 public minimumAuctionTime = 0;
+    uint256 public minimumAuctionTime;
 
     /// @dev Some constants for non-Reentrancy modifier
     uint256 private _status;
@@ -72,9 +75,10 @@ contract Marketplace1155 {
         address indexed NFTAddress,
         uint256 indexed orderId,
         address indexed seller,
+        address erc20,
         uint256 tokenId,
         uint256 amount,
-        uint256 priceWEI
+        uint256 price
     );
     event OrderRemoved(
         address indexed NFTAddress,
@@ -100,15 +104,17 @@ contract Marketplace1155 {
     event OrderCompleted(
         address indexed NFTAddress,
         uint256 indexed orderId,
-        address indexed buyer
+        address indexed buyer,
+        address erc20
     );
     event AuctionStarted(
         address indexed NFTAddress,
         uint256 indexed auctionId,
         address indexed seller,
+        address erc20,
         uint256 tokenId,
         uint256 amount,
-        uint256 startPriceWEI
+        uint256 startprice
     );
     event BibDone(
         address indexed NFTAddress,
@@ -120,6 +126,7 @@ contract Marketplace1155 {
         address indexed NFTAddress,
         uint256 indexed auctionId,
         address indexed bestBidder,
+        address erc20,
         uint256 bestBid,
         uint256 tokenId,
         uint256 amount
@@ -146,7 +153,8 @@ contract Marketplace1155 {
      * @param contractAddress ERC1155 contract address
      * @param tokenId NFT token ID you want to sell
      * @param amount Quantity on tokens to sell
-     * @param priceWEI Price value in WEI for NFT order, must be equal or more 10000 
+     * @param price Price value in selected currency, must be equal or more 10000
+     * @param currency Crypto-currency type name which must be payed for NFT
      * @dev Function makes an call to 'contractAddress' contract to get 'percentFee' value 
      *      to pay fee to owner
      */
@@ -154,9 +162,10 @@ contract Marketplace1155 {
         address contractAddress,
         uint256 tokenId,
         uint256 amount,
-        uint256 priceWEI
+        uint256 price,
+        string calldata currency
     ) external {
-        require(priceWEI >= 10000, "Minimal price for sale is 10000 WEI");
+        require(price >= 10000, "Minimal price for sale is 10000 value");
         
         IERC1155UUPS(contractAddress).safeTransferFrom(
             msg.sender,
@@ -168,9 +177,14 @@ contract Marketplace1155 {
 
         uint256 orderId = TradingInfo[contractAddress].lastOrderId;
 
+        address erc20address = IERC1155UUPS(contractAddress).erc20();
+        if (keccak256(abi.encodePacked(currency)) == keccak256(abi.encodePacked("erc20")) && erc20address != address(0)) {
+            TradingInfo[contractAddress].NFTOrders[orderId].erc20 = erc20address;
+        }
+
         TradingInfo[contractAddress].NFTOrders[orderId].orderId = orderId;
         TradingInfo[contractAddress].NFTOrders[orderId].tokenId = tokenId;
-        TradingInfo[contractAddress].NFTOrders[orderId].priceWEI = priceWEI;
+        TradingInfo[contractAddress].NFTOrders[orderId].price = price;
         TradingInfo[contractAddress].NFTOrders[orderId].amount = amount;
         TradingInfo[contractAddress].NFTOrders[orderId].seller = msg.sender;
         TradingInfo[contractAddress].NFTOrders[orderId].percentFee = IERC1155UUPS(contractAddress).percentFee();
@@ -178,7 +192,7 @@ contract Marketplace1155 {
         TradingInfo[contractAddress].lastOrderId++;
         TradingInfo[contractAddress].currentOrders++;
 
-        emit OrderAdded(contractAddress, orderId, msg.sender, tokenId, amount, priceWEI);
+        emit OrderAdded(contractAddress, orderId, msg.sender, erc20address, tokenId, amount, price);
     }
 
     /**
@@ -208,20 +222,29 @@ contract Marketplace1155 {
      * @notice Funds an order you want to redeem, function must be funded with enough WEI
      * @param contractAddress ERC1155 contract address
      * @param orderId Order id you want to redeem
-     * @dev WEI value must be equal or more then order price, buyer address must be zero
+     * @dev Value must be equal or more then order price, buyer address must be zero
      */
     function redeemOrder(address contractAddress, uint256 orderId)
         external
         payable
     {
         require(
-            msg.value == TradingInfo[contractAddress].NFTOrders[orderId].priceWEI,
-            "Incorrect funds to redeem"
-        );
-        require(
             TradingInfo[contractAddress].NFTOrders[orderId].buyer == address(0),
             "Order has been funded"
         );
+
+        if (TradingInfo[contractAddress].NFTOrders[orderId].erc20 != address(0)) {
+            IERC20Upgradeable(TradingInfo[contractAddress].NFTOrders[orderId].erc20).transferFrom(
+                msg.sender,
+                address(this),
+                TradingInfo[contractAddress].NFTOrders[orderId].price
+            );
+        } else {
+            require(
+                msg.value == TradingInfo[contractAddress].NFTOrders[orderId].price,
+                "Incorrect funds to redeem"
+            );
+        }
 
         TradingInfo[contractAddress].NFTOrders[orderId].buyer = msg.sender;
 
@@ -248,7 +271,13 @@ contract Marketplace1155 {
 
             emit SellerAccepted(contractAddress, orderId, isAccepted);
         } else {
-            (bool success, ) = buyer.call{value: TradingInfo[contractAddress].NFTOrders[orderId].priceWEI}("");
+            Order storage order = TradingInfo[contractAddress].NFTOrders[orderId];
+
+            if (order.erc20 != address(0)) {
+                IERC20Upgradeable(order.erc20).transfer(order.buyer, order.price);
+            } else {
+                (bool success, ) = order.buyer.call{value: order.price}("");
+            }
 
             TradingInfo[contractAddress].NFTOrders[orderId].buyer = address(0);
 
@@ -260,17 +289,21 @@ contract Marketplace1155 {
      * @notice Returns funds to order buyer, can only be called by order seller or buyer
      * @param contractAddress ERC1155 contract address
      * @param orderId Order id you want to return funds
-     * @dev Do not revert if can not send WEI to order buyer
+     * @dev Do not revert if can not send funds to order buyer
      */
     function declineOrder(address contractAddress, uint256 orderId)
-    external
-    nonReentrant
+        external
+        nonReentrant
     {
         Order storage order = TradingInfo[contractAddress].NFTOrders[orderId];
         require(msg.sender == order.buyer || msg.sender == order.seller, "Only seller or buyer can decline");
         require(order.buyer != address(0), "Nothing to decline");
 
-        (bool success, ) = order.buyer.call{value: order.priceWEI}("");
+        if (order.erc20 != address(0)) {
+            IERC20Upgradeable(order.erc20).transfer(order.buyer, order.price);
+        } else {
+            (bool success, ) = order.buyer.call{value: order.price}("");
+        }
 
         TradingInfo[contractAddress].NFTOrders[orderId].buyer = address(0);
         TradingInfo[contractAddress].NFTOrders[orderId].sellerAccepted = false;
@@ -292,14 +325,21 @@ contract Marketplace1155 {
         require(order.sellerAccepted, "Seller didnt accept a trade");
         require(order.buyer != address(0), "No one redeems an order");
 
-        uint256 fee = (order.priceWEI * order.percentFee) / (100 ** percentDecimals);
-        uint256 reward = order.priceWEI - fee;
+        uint256 fee = (order.price * order.percentFee) / (100 ** percentDecimals);
+        uint256 reward = order.price - fee;
 
-        (bool hasSentWEIToSeller, ) = order.seller.call{value: reward}("");
-        require(hasSentWEIToSeller, "Can not send WEI to seller");
+        address ERC1155ContractOwner = IERC1155UUPS(contractAddress).owner();
 
-        (bool hasSentWEIToOwner, ) = IERC1155UUPS(contractAddress).owner().call{value: fee}("");
-        require(hasSentWEIToOwner, "Can not send WEI to NFT contract Owner");
+        if(order.erc20 != address(0)) {
+            IERC20Upgradeable(order.erc20).transfer(order.seller, reward);
+            IERC20Upgradeable(order.erc20).transfer(ERC1155ContractOwner, fee);
+        } else {
+            (bool hasSentWEIToSeller, ) = order.seller.call{value: reward}("");
+            require(hasSentWEIToSeller, "Can not send WEI to seller");
+
+            (bool hasSentWEIToOwner, ) = IERC1155UUPS(contractAddress).owner().call{value: fee}("");
+            require(hasSentWEIToOwner, "Can not send WEI to NFT contract Owner");
+        }
 
         IERC1155UUPS(contractAddress).safeTransferFrom(address(this), order.buyer, order.tokenId, order.amount, bytes("0"));
 
@@ -307,7 +347,7 @@ contract Marketplace1155 {
 
         delete TradingInfo[contractAddress].NFTOrders[orderId];
 
-        emit OrderCompleted(contractAddress, orderId, order.buyer);
+        emit OrderCompleted(contractAddress, orderId, order.buyer, order.erc20);
     }
 
     /**
@@ -317,6 +357,7 @@ contract Marketplace1155 {
      * @param amount Quantity of tokens you want to sell on auction
      * @param initialPrice Start price in WEI for NFT on auction 
      * @param secondsToEnd How much seconds should be passed for auction to be ended
+     * @param currency Crypto-currency name type, which must be paid for NFT
      * @dev Gets value of 'percentFee' from 'contractAddress' contract
      */
     function startAuction(
@@ -324,7 +365,8 @@ contract Marketplace1155 {
         uint256 tokenId,
         uint256 amount,
         uint256 initialPrice,
-        uint256 secondsToEnd
+        uint256 secondsToEnd,
+        string calldata currency
     ) external {
         require(initialPrice >= 10000, "Minimal price for sale is 10000 WEI");
         require(secondsToEnd >= minimumAuctionTime, "Time must be more then minimal auction time");
@@ -339,6 +381,11 @@ contract Marketplace1155 {
 
         uint256 auctionId = TradingInfo[contractAddress].lastAuctionId;
 
+        address erc20address = IERC1155UUPS(contractAddress).erc20();
+        if (keccak256(abi.encodePacked(currency)) == keccak256(abi.encodePacked("erc20")) && erc20address != address(0)) {
+            TradingInfo[contractAddress].NFTAuctions[auctionId].erc20 = erc20address;
+        }
+
         TradingInfo[contractAddress].NFTAuctions[auctionId].auctionId = auctionId;
         TradingInfo[contractAddress].NFTAuctions[auctionId].bestBid = initialPrice;
         TradingInfo[contractAddress].NFTAuctions[auctionId].tokenId = tokenId;
@@ -350,33 +397,70 @@ contract Marketplace1155 {
         TradingInfo[contractAddress].lastAuctionId++;
         TradingInfo[contractAddress].currentAuctions++;
 
-        emit AuctionStarted(contractAddress, tokenId, msg.sender, tokenId, amount, initialPrice);
+        emit AuctionStarted(
+                contractAddress,
+                auctionId,
+                msg.sender,
+                TradingInfo[contractAddress].NFTAuctions[auctionId].erc20,
+                tokenId,
+                amount,
+                initialPrice
+        );
     }
 
     /**
      * @notice Makes a bid for an auction order, must be more then previous one and
-     *         pays for transferring the last 'bestBidder' his 'bestBid'
+     *         pays for transferring the last 'bestBidder' his 'bestBid', if price
+     *         is in ERC20 tokens, you should approve your 'BestBid' before making a bid
      * @param contractAddress ERC1155 contract address
      * @param auctionId Auction id you want to win
-     * @dev Not reverts if can not send WEI to last 'bestBidder'
+     * @dev Not reverts if can not send WEI to the last 'bestBidder'
      */
     function makeBid(address contractAddress, uint256 auctionId) external payable nonReentrant {
         Auction storage auction = TradingInfo[contractAddress].NFTAuctions[auctionId];
 
         require(auction.seller != address(0), "Tokens is not on sale");
         require(auction.auctionEndUnix > block.timestamp, "Auction time passed");
-        require(msg.value > auction.bestBid, "Bid must be higher than previous");
 
-        (bool success, ) = auction.bestBidder.call{value: auction.bestBid}("");
+        if (auction.erc20 != address(0)) {
+            uint256 allowedAmount = IERC20Upgradeable(auction.erc20).allowance(msg.sender, address(this));
+
+            require(
+                 allowedAmount > auction.bestBid,
+                "Bid must be higher than previous"
+            );
+
+            IERC20Upgradeable(auction.erc20).transferFrom(
+                msg.sender,
+                address(this),
+                allowedAmount
+            );
+
+            if(auction.bestBidder != address(0)) {
+                IERC20Upgradeable(auction.erc20).transfer(
+                    auction.bestBidder,
+                    auction.bestBid
+                );
+            }
+
+            TradingInfo[contractAddress].NFTAuctions[auctionId].bestBid = allowedAmount;
+        } else {
+            require(msg.value > auction.bestBid, "Bid must be higher than previous");
+
+            if(auction.bestBidder != address(0)) {
+                (bool success, ) = auction.bestBidder.call{value: auction.bestBid}("");
+            }
+
+            TradingInfo[contractAddress].NFTAuctions[auctionId].bestBid = msg.value;
+        }
 
         TradingInfo[contractAddress].NFTAuctions[auctionId].bestBidder = msg.sender;
-        TradingInfo[contractAddress].NFTAuctions[auctionId].bestBid = msg.value;
 
         emit BibDone(contractAddress, auctionId, msg.sender, msg.value);
     }
 
     /**
-     * @notice Initialize token transfer to 'bestBidder', fees to NFT contract owner and reward to seller,
+     * @notice Initialize NFT transfer to 'bestBidder', fees to NFT contract owner and reward to seller,
      * if there is no any bids, NFT transfers back to seller
      * @param contractAddress ERC1155 contract address
      * @param auctionId Auction id you want to finish and initialize
@@ -387,6 +471,9 @@ contract Marketplace1155 {
 
         require(auction.auctionEndUnix < block.timestamp, "Auction time did not pass");
 
+        uint256 fee = (auction.bestBid * auction.percentFee) / (100 ** percentDecimals);
+        uint256 reward = auction.bestBid - fee;
+
         if(auction.bestBidder == address(0)) {
             IERC1155UUPS(contractAddress).safeTransferFrom(
                 address(this),
@@ -396,29 +483,46 @@ contract Marketplace1155 {
                 bytes("0")
             );
         } else {
-            uint256 fee = (auction.bestBid * auction.percentFee) / (100 ** percentDecimals);
-            uint256 reward = auction.bestBid - fee;
+            if(auction.erc20 != address(0)){
+                IERC20Upgradeable(auction.erc20).transfer(
+                    auction.seller,
+                    reward
+                );
 
-            (bool hasSentWEIToSeller, ) = auction.seller.call{value: reward}("");
-            require(hasSentWEIToSeller, "Can not send WEI to seller");
+                IERC20Upgradeable(auction.erc20).transfer(
+                    IERC1155UUPS(contractAddress).owner(),
+                    fee
+                );
 
-            (bool hasSentWEIToOwner, ) = IERC1155UUPS(contractAddress).owner().call{value: fee}("");
-            require(hasSentWEIToOwner, "Can not send WEI to NFT contract Owner");
+                IERC1155UUPS(contractAddress).safeTransferFrom(
+                    address(this),
+                    auction.bestBidder,
+                    auction.tokenId,
+                    auction.amount,
+                    bytes("0")
+                );
+            } else {
+                (bool hasSentWEIToSeller, ) = auction.seller.call{value: reward}("");
+                require(hasSentWEIToSeller, "Can not send WEI to seller");
 
-            IERC1155UUPS(contractAddress).safeTransferFrom(
-                address(this),
-                auction.bestBidder,
-                auction.tokenId,
-                auction.amount,
-                bytes("0")
-            );
+                (bool hasSentWEIToOwner, ) = IERC1155UUPS(contractAddress).owner().call{value: fee}("");
+                require(hasSentWEIToOwner, "Can not send WEI to NFT contract Owner");
+
+                IERC1155UUPS(contractAddress).safeTransferFrom(
+                    address(this),
+                    auction.bestBidder,
+                    auction.tokenId,
+                    auction.amount,
+                    bytes("0")
+                );
+            }
         }
 
         TradingInfo[contractAddress].currentAuctions--;
 
         delete TradingInfo[contractAddress].NFTAuctions[auctionId];
 
-        emit AuctionEnded(contractAddress, auctionId, auction.bestBidder, auction.bestBid, auction.tokenId, auction.amount);
+        emit AuctionEnded(contractAddress, auctionId, auction.bestBidder, auction.erc20, auction.bestBid, auction.tokenId, auction.amount);
     }
 
     function setMinimalAuctionTime(uint256 timeInSeconds) external {

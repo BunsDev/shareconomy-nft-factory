@@ -31,6 +31,8 @@ contract ERC721 is Initializable, ERC721Upgradeable, AccessControlUpgradeable, U
     address public owner;
     /// @notice Deployer contract address
     address public factory;
+    /// @notice NFT collection ERC20 token
+    address public erc20;
     /// @notice Fee in percent which contract owner takes for selling NFT on Trade contract
     uint256 public percentFee;
     /// @notice Decimals of 'percentFee' number, example: 25.55% in 'percentFee' would be 2555
@@ -43,6 +45,7 @@ contract ERC721 is Initializable, ERC721Upgradeable, AccessControlUpgradeable, U
         string memory symbol_,
         string memory baseURI_,
         address owner_,
+        address erc20_,
         uint256 percentFee_,
         uint256 amount_
     ) initializer public {
@@ -52,6 +55,7 @@ contract ERC721 is Initializable, ERC721Upgradeable, AccessControlUpgradeable, U
 
         owner = owner_;
         factory = msg.sender;
+        erc20 = erc20_;
         baseURI = baseURI_;
         percentFee = percentFee_;
         _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
@@ -79,6 +83,12 @@ contract ERC721 is Initializable, ERC721Upgradeable, AccessControlUpgradeable, U
     /// @dev Overriding internal function
     function _baseURI() internal view override returns (string memory) {
         return baseURI;
+    }
+
+    /// @notice Changes ERC20 address for this collection
+    function changeERC20Address(address newERC20Address) external onlyRole(ADMIN_ROLE) {
+        require(IERC165Upgradeable(erc20).supportsInterface(0x01ffc9a7), "Contract does not support ERC20");
+        erc20 = newERC20Address;
     }
 
     /// @notice Changes fee percent for NFT contract owner, available only for ADMIN_ROLE
@@ -124,7 +134,7 @@ contract ERC721 is Initializable, ERC721Upgradeable, AccessControlUpgradeable, U
     function getContractMetadata() public view returns(Metadata memory metadata) {
         metadata.name = name();
         metadata.symbol = symbol();
-        metadata.tokenType = supportsInterface(0x80ac58cd) ? "ERC721" : "";
+        metadata.tokenType = supportsInterface(0x80ac58cd) ? "ERC721" : "Unknown interface id";
         metadata.baseUri = _baseURI();
     }
 

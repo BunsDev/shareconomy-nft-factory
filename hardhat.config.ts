@@ -8,6 +8,7 @@ dotenv.config();
 import "./tasks/Testing.task"
 
 const config: HardhatUserConfig = {
+  defaultNetwork: "hardhat",
   networks: {
     mumbai: {
       url: `https://polygon-mumbai.g.alchemy.com/v2/${process.env.ALCHEMY_MUMBAI_KEY}`,
@@ -20,6 +21,8 @@ const config: HardhatUserConfig = {
       accounts:
           process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : []
     },
+    hardhat: {
+    }
   },
   etherscan: {
     apiKey: {
@@ -37,7 +40,7 @@ const config: HardhatUserConfig = {
   contractSizer: {
     alphaSort: true,
     disambiguatePaths: false,
-    runOnCompile: false,
+    runOnCompile: true,
     strict: true,
   },
   solidity: {
